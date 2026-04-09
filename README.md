@@ -1,0 +1,1 @@
+# xauusd_backtest_pa_engulf_macd_ema50
