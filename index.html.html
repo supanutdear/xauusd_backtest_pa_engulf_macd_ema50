@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XAU/USD Backtest Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f5f3;
+    --bg3: #ebebea;
+    --text: #1a1a18;
+    --text2: #6b6b67;
+    --text3: #9b9b97;
+    --border: rgba(0,0,0,0.1);
+    --green: #1D9E75;
+    --red: #E24B4A;
+    --green-bg: #EAF3DE;
+    --green-text: #3B6D11;
+    --red-bg: #FCEBEB;
+    --red-text: #A32D2D;
+    --accent: #1D9E75;
+  }
+  body { background: var(--bg3); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--text); min-height: 100vh;  }
+  .page { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+  .header { margin-bottom: 2rem; }
+  .header h1 { font-size: 18px; font-weight: 500; color: var(--text); letter-spacing: -0.02em; }
+  .header p { font-size: 12px; color: var(--text2); margin-top: 6px; letter-spacing: 0.02em; }
+  .badge { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 3px; background: var(--green-bg); color: var(--green-text); margin-left: 8px; vertical-align: middle; font-weight: 500; border: 1px solid rgba(34,197,94,0.2); letter-spacing: 0.05em; }
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+  @media(max-width:640px) { .metrics { grid-template-columns: repeat(2,1fr); } .row2,.row3 { grid-template-columns: 1fr; } }
+  .metric { background: var(--bg2); border-radius: 4px; padding: 14px 16px; border: 1px solid var(--border); }
+  .metric .label { font-size: 10px; color: var(--text3); margin-bottom: 8px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .metric .value { font-size: 24px; font-weight: 400; color: var(--text); letter-spacing: -0.03em; }
+  .metric .value.up { color: var(--green); }
+  .metric .value.down { color: var(--red); }
+  .metric .sub { font-size: 10px; color: var(--text3); margin-top: 6px; letter-spacing: 0.02em; }
+  .card { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1.25rem; margin-bottom: 1rem; }
+  .card-title { font-size: 10px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 1rem; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { color: var(--text2); font-weight: 500; text-align: right; padding: 6px 8px; border-bottom: 0.5px solid var(--border); font-size: 12px; }
+  th:first-child { text-align: left; }
+  td { text-align: right; padding: 7px 8px; border-bottom: 0.5px solid var(--border); }
+  td:first-child { text-align: left; font-weight: 500; }
+  tr:last-child td { border-bottom: none; }
+  .pos { color: var(--green); } .neg { color: var(--red); }
+  .cond-row { display: flex; align-items: center; padding: 6px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; }
+  .cond-row:last-child { border-bottom: none; }
+  .cond-label { width: 110px; color: var(--text2); flex-shrink: 0; font-size: 12px; }
+  .cond-bar-wrap { flex: 1; height: 5px; background: var(--bg3); border-radius: 3px; margin: 0 10px; overflow: hidden; }
+  .cond-bar { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .cond-val { width: 44px; text-align: right; font-weight: 600; font-size: 13px; }
+  .cond-diff { width: 72px; text-align: right; font-size: 11px; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .stat-item { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .stat-item:nth-last-child(-n+2) { border-bottom: none; }
+  .stat-item .k { color: var(--text2); } .stat-item .v { font-weight: 500; }
+  .stat-item:nth-child(odd) { padding-right: 12px; }
+  .stat-item:nth-child(even) { padding-left: 12px; border-left: 0.5px solid var(--border); }
+  footer { text-align: center; font-size: 10px; color: var(--text3); padding: 2rem 0 1rem; letter-spacing: 0.1em; text-transform: uppercase; }
+  .dropdown { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 1rem; overflow: hidden; }
+  .dropdown-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; cursor: pointer; background: none; border: none; color: var(--text); font-family: 'JetBrains Mono', 'SF Mono', monospace; font-size: 13px; font-weight: 500; text-align: left; }
+  .dropdown-toggle:hover { background: var(--bg2); }
+  .dropdown-toggle .icon { font-size: 16px; color: var(--text2); transition: transform 0.25s; }
+  .dropdown-toggle.open .icon { transform: rotate(180deg); }
+  .dropdown-body { display: none; padding: 0 1.25rem 1.25rem; border-top: 0.5px solid var(--border); }
+  .dropdown-body.open { display: block; }
+  .entry-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+  @media(max-width:600px) { .entry-grid { grid-template-columns: 1fr; } }
+  .entry-block { background: var(--bg2); border-radius: 4px; padding: 1rem; border: 1px solid var(--border); }
+  .entry-block h3 { font-size: 13px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .entry-block h3 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .entry-block .dot-buy { background: #22c55e; }
+  .entry-block .dot-sell { background: #ef4444; }
+  .condition-list { list-style: none; }
+  .condition-list li { font-size: 12px; color: var(--text2); padding: 5px 0; border-bottom: 0.5px solid var(--border); display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+  .condition-list li:last-child { border-bottom: none; }
+  .condition-list li::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--text3); margin-top: 6px; flex-shrink: 0; }
+  .config-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 1rem; }
+  @media(max-width:600px) { .config-grid { grid-template-columns: repeat(2, 1fr); } }
+  .config-item { background: var(--bg2); border-radius: 8px; padding: 10px 12px; }
+  .config-item .ck { font-size: 11px; color: var(--text3); margin-bottom: 3px; }
+  .config-item .cv { font-size: 14px; font-weight: 600; color: var(--text); }
+  .tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 99px; margin-left: 6px; }
+  .tag-buy { background: var(--green-bg); color: var(--green-text); }
+  .tag-sell { background: var(--red-bg); color: var(--red-text); }
+  .flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .flow-step { background: var(--bg); border: 0.5px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; }
+  .flow-arrow { color: var(--text3); font-size: 14px; }
+
+  .tip-wrap { position: relative; display: inline-flex; align-items: center; }
+  .tip-icon { display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; border-radius: 2px; background: var(--bg3); color: var(--text3); font-size: 9px; font-weight: 700; margin-left: 5px; cursor: pointer; border: 1px solid var(--border); flex-shrink: 0; }
+  .tip-box { display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: 230px; background: var(--bg); border: 0.5px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 11px; color: var(--text2); line-height: 1.6; z-index: 99; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .tip-box b { color: var(--text); display: block; margin-bottom: 3px; font-size: 12px; }
+  .tip-box code { font-family: monospace; font-size: 10px; background: var(--bg2); padding: 3px 6px; border-radius: 4px; margin: 4px 0; display: block; }
+  .tip-box .lvl { margin-top: 6px; padding-top: 6px; border-top: 0.5px solid var(--border); font-size: 10px; }
+  .tip-wrap:hover .tip-box { display: block; }
+  .risk-metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 1.25rem; }
+  @media(max-width:640px){.risk-metrics{grid-template-columns:1fr;}}
+  .rmetric { background: var(--bg2); border-radius: 4px; padding: 14px 16px; border: 1px solid var(--border); }
+  .rmetric .rl { font-size: 10px; color: var(--text3); margin-bottom: 8px; display: flex; align-items: center; gap: 4px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .rmetric .rv { font-size: 24px; font-weight: 400; color: var(--text); letter-spacing: -0.03em; }
+  .rmetric .rs { font-size: 10px; color: var(--text3); margin-top: 6px; }
+  .rbar-wrap { height: 4px; background: var(--bg3); border-radius: 2px; margin-top: 8px; }
+  .rbar { height: 100%; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <h1>XAU/USD Backtest Dashboard <span class="badge">PA Engulf + MACD + EMA50</span></h1>
+    <p>Timeframe 15m &nbsp;·&nbsp; 2021–2025 &nbsp;·&nbsp; Initial Capital $10,000 &nbsp;·&nbsp; Risk 3% per trade &nbsp;·&nbsp; RR 1:1</p>
+  </div>
+
+  <div class="dropdown">
+    <button class="dropdown-toggle" onclick="toggleDD(this)">
+      <span>Strategy &amp; Entry Conditions</span>
+      <span class="icon">▾</span>
+    </button>
+    <div class="dropdown-body">
+      <div class="flow">
+        <div class="flow-step">Price Action<br><span style="font-size:10px;font-weight:400;color:var(--text2);">Engulf Wick Grab</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">MACD Filter<br><span style="font-size:10px;font-weight:400;color:var(--text2);">10 / 30 / 9</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">EMA Filter<br><span style="font-size:10px;font-weight:400;color:var(--text2);">EMA 50</span></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="background:var(--green-bg);color:var(--green-text);border-color:transparent;">Entry</div>
+      </div>
+
+      <div class="entry-grid">
+        <div class="entry-block">
+          <h3><span class="dot dot-buy"></span>BUY Signal <span class="tag tag-buy">Long</span></h3>
+          <ul class="condition-list">
+            <li>Bullish candle (Close > Open)</li>
+            <li>Lower wick grabs the low of previous 2 bars</li>
+            <li>Close above the high of previous 2 bars (Engulf)</li>
+            <li>MACD Line > Signal Line (Bullish momentum)</li>
+            <li>Price closing above EMA50 (Uptrend)</li>
+          </ul>
+        </div>
+        <div class="entry-block">
+          <h3><span class="dot dot-sell"></span>SELL Signal <span class="tag tag-sell">Short</span></h3>
+          <ul class="condition-list">
+            <li>Bearish candle (Close < Open)</li>
+            <li>Upper wick grabs the high of previous 2 bars</li>
+            <li>Close below the low of previous 2 bars (Engulf)</li>
+            <li>MACD Line < Signal Line (Bearish momentum)</li>
+            <li>Price closing below EMA50 (Downtrend)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="entry-grid" style="margin-top:1rem;">
+        <div class="entry-block">
+          <h3>Stop Loss &amp; Take Profit</h3>
+          <ul class="condition-list">
+            <li><strong style="color:var(--text);">Entry:</strong> Close price of signal bar</li>
+            <li><strong style="color:var(--text);">Stop Loss:</strong> Bar Low (BUY) / Bar High (SELL)</li>
+            <li><strong style="color:var(--text);">Take Profit:</strong> Entry ± (SL Distance × RR Ratio)</li>
+            <li><strong style="color:var(--text);">Skip:</strong> If SL Distance > 0.4% of price</li>
+          </ul>
+        </div>
+        <div class="entry-block">
+          <h3>Money Management</h3>
+          <ul class="condition-list">
+            <li>Risk per trade: 3% of current capital (compound)</li>
+            <li>RR Ratio: 1:1 (TP = SL distance)</li>
+            <li>No overlapping trades — wait for current trade to close</li>
+            <li>Skip new signals while a trade is active</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="config-grid">
+        <div class="config-item"><div class="ck">Initial Capital</div><div class="cv">$10,000</div></div>
+        <div class="config-item"><div class="ck">Risk per Trade</div><div class="cv">3%
+          <span class="tip-wrap" style="margin-left:4px;">
+            <span class="tip-icon" tabindex="0">i</span>
+            <div class="tip-box" style="left:auto;right:0;transform:none;width:260px;">
+              <b>Note on Risk Setting</b>
+              Results are based on 3% risk per trade for demonstration. Lower risk configurations would reduce drawdown accordingly.
+            </div>
+          </span>
+        </div></div>
+        <div class="config-item"><div class="ck">RR Ratio</div><div class="cv">1 : 1</div></div>
+        <div class="config-item"><div class="ck">Max SL</div><div class="cv">0.4%
+          <span class="tip-wrap" style="margin-left:4px;">
+            <span class="tip-icon" tabindex="0">i</span>
+            <div class="tip-box" style="left:0;right:auto;transform:none;width:280px;">
+              <b>Why a %-based Max SL Filter?</b>
+              Filters out PA signals with excessively wide stop-losses, which commonly occur during high-impact news events (e.g. NFP, CPI). Using a percentage-based threshold rather than a fixed pip value accounts for the fact that XAU/USD price levels — and therefore natural SL distances — vary significantly across different market years.
+            </div>
+          </span>
+        </div></div>
+        <div class="config-item"><div class="ck">MACD</div><div class="cv">10 / 30 / 9</div></div>
+        <div class="config-item"><div class="ck">EMA Filter</div><div class="cv">EMA 50</div></div>
+        <div class="config-item"><div class="ck">Timeframe</div><div class="cv">15 minutes</div></div>
+        <div class="config-item"><div class="ck">Data Period</div><div class="cv">2021–2025</div></div>
+        <div class="config-item"><div class="ck">Instrument</div><div class="cv">XAU/USD</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><div class="label">Final Capital</div><div class="value up">$34,621</div><div class="sub">from $10,000</div></div>
+    <div class="metric"><div class="label">Total Return</div><div class="value up">+246.2%</div><div class="sub">over 5 years</div></div>
+    <div class="metric"><div class="label">Win Rate</div><div class="value">54.0%</div><div class="sub">346W / 295L</div></div>
+    <div class="metric"><div class="label">Max Drawdown</div><div class="value down">38.53%
+          <span class="tip-wrap" style="margin-left:4px;">
+            <span class="tip-icon" tabindex="0">i</span>
+            <div class="tip-box" style="left:auto;right:0;transform:none;width:280px;">
+              <b>Note on Drawdown</b>
+              The observed drawdown (~38%) highlights the importance of position sizing. A practical deployment would likely target a lower drawdown range (e.g., 20–25%) at the cost of reduced returns.
+            </div>
+          </span>
+        </div><div class="sub">Profit Factor 1.13</div></div>
+  </div>
+
+
+  <div class="risk-metrics">
+    <div class="rmetric">
+      <div class="rl">Sharpe Ratio
+        <div class="tip-wrap">
+          <span class="tip-icon" tabindex="0">i</span>
+          <div class="tip-box">
+            <b>Sharpe Ratio</b>
+            Measures return per unit of total risk (both upside and downside)
+            <code>mean(R) / std(R) × √(trades/year)</code>
+            <div class="lvl">This value: 0.90 (Trade-based)<br>
+            <1.0 = Moderate · 1-2 = Good · >2 = Excellent</div>
+          </div>
+        </div>
+      </div>
+      <div class="rv">0.90</div>
+      <div class="rs">Trade-based annualized</div>
+      <div class="rbar-wrap"><div class="rbar" style="width:45%;background:#f59e0b;"></div></div>
+    </div>
+
+    <div class="rmetric">
+      <div class="rl">Sortino Ratio
+        <div class="tip-wrap">
+          <span class="tip-icon" tabindex="0">i</span>
+          <div class="tip-box">
+            <b>Sortino Ratio</b>
+            Like Sharpe butonly downside volatility does not penalize upside gains
+            <code>mean(R) / downside_std × √(trades/year)</code>
+            <div class="lvl">This value: 0.90 ≈ Sharpe<br>
+            Because fixed 3% risk per trade makes all losses nearly equal</div>
+          </div>
+        </div>
+      </div>
+      <div class="rv">0.90</div>
+      <div class="rs">Downside-adjusted</div>
+      <div class="rbar-wrap"><div class="rbar" style="width:45%;background:#f59e0b;"></div></div>
+    </div>
+
+    <div class="rmetric">
+      <div class="rl">Calmar Ratio
+        <div class="tip-wrap">
+          <span class="tip-icon" tabindex="0">i</span>
+          <div class="tip-box">
+            <b>Calmar Ratio</b>
+            Measures if annual return justifies the max drawdown taken
+            <code>Annual Return % / Max Drawdown %</code>
+            <div class="lvl">This value: 1.28 = Good<br>
+            <0.5 = Poor · 0.5-1 = Fair · 1-2 = Good · >2 = Excellent</div>
+          </div>
+        </div>
+      </div>
+      <div class="rv" style="color:var(--green);">1.28</div>
+      <div class="rs">51.5% annual / 38.53% DD</div>
+      <div class="rbar-wrap"><div class="rbar" style="width:67%;background:#22c55e;"></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Equity Curve</div>
+    <div style="position:relative;width:100%;height:280px;"><canvas id="equityChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Annual Return (%)</div>
+    <div style="position:relative;width:100%;height:180px;"><canvas id="annualChart"></canvas></div>
+  </div>
+
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Annual Breakdown</div>
+      <table>
+        <thead><tr><th>years</th><th>Trades</th><th>WR%</th><th>PnL</th><th>Return%</th></tr></thead>
+        <tbody>
+          <tr><td>2021</td><td>154</td><td>53.9%</td><td class="pos">+$3,375</td><td class="pos">+33.7%</td></tr>
+          <tr><td>2022</td><td>130</td><td>54.6%</td><td class="pos">+$4,708</td><td class="pos">+35.2%</td></tr>
+          <tr><td>2023</td><td>119</td><td>57.1%</td><td class="pos">+$10,464</td><td class="pos">+57.9%</td></tr>
+          <tr><td>2024</td><td>98</td><td>49.0%</td><td class="neg">-$2,823</td><td class="neg">-9.9%</td></tr>
+          <tr><td>2025</td><td>140</td><td>54.3%</td><td class="pos">+$8,898</td><td class="pos">+34.6%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Summary Statistics</div>
+      <div class="stat-grid">
+        <div class="stat-item"><span class="k">Total Trades</span><span class="v">641</span></div>
+        <div class="stat-item"><span class="k">Skipped (SL>0.4%)</span><span class="v">82</span></div>
+        <div class="stat-item"><span class="k">BUY Win Rate</span><span class="v">51.8%</span></div>
+        <div class="stat-item"><span class="k">SELL Win Rate</span><span class="v">56.2%</span></div>
+        <div class="stat-item"><span class="k">Max Win Streak</span><span class="v">9 trades</span></div>
+        <div class="stat-item"><span class="k">Max Loss Streak</span><span class="v">7 trades</span></div>
+        <div class="stat-item"><span class="k">Profit Factor</span><span class="v">1.13</span></div>
+        <div class="stat-item"><span class="k">SL+TP same bar</span><span class="v">4 (0.6%)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:16px;margin:1.5rem 0 1rem;">
+    <div style="flex:1;height:0.5px;background:var(--border);"></div>
+    <span style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:0.08em;white-space:nowrap;">MORE STATISTICAL ANALYSIS</span>
+    <div style="flex:1;height:0.5px;background:var(--border);"></div>
+  </div>
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Conditional Probability</div>
+      <div id="condRows"></div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text3);">Baseline Win Rate: 54.0%</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Loss Streak Distribution</div>
+      <div style="position:relative;width:100%;height:220px;"><canvas id="streakChart"></canvas></div>
+    </div>
+  </div>
+
+  <footer>XAU/USD Backtest · PA Engulf + MACD(10/30/9) + EMA50 · Timeframe 15m · 2021–2025</footer>
+</div>
+
+<script>
+const isDark = true;
+const tc = '#444440';
+const gc = 'rgba(255,255,255,0.04)';
+
+const eq = [10000.0, 9700.0, 9409.0, 9126.73, 9400.53, 9682.55, 9392.07, 9673.83, 9964.04, 9665.12, 9375.17, 9093.91, 8821.09, 9085.72, 8813.15, 9077.54, 9349.87, 9069.37, 9341.45, 9061.21, 8789.37, 9053.05, 9324.64, 9604.38, 9316.25, 9036.76, 8765.66, 8502.69, 8247.61, 8000.18, 8240.19, 8487.4, 8742.02, 8479.76, 8734.15, 8472.13, 8726.29, 8988.08, 8718.44, 8979.99, 9249.39, 8971.91, 9241.07, 8963.84, 8694.92, 8955.77, 9224.44, 8947.71, 9216.14, 9492.62, 9207.84, 9484.08, 9768.6, 10061.66, 10363.51, 10674.42, 10994.65, 11324.49, 11664.22, 11314.29, 11653.72, 12003.33, 11643.23, 11992.53, 12352.31, 11981.74, 11622.29, 11970.96, 11611.83, 11263.48, 11601.38, 11949.42, 12307.9, 12677.14, 13057.45, 13449.17, 13852.65, 13437.07, 13033.96, 12642.94, 12263.65, 12631.56, 12252.61, 12620.19, 12998.8, 12608.84, 12987.11, 12597.5, 12975.42, 12586.16, 12963.74, 12574.83, 12952.07, 13340.63, 12940.41, 12552.2, 12175.63, 12540.9, 12917.13, 13304.64, 12905.5, 13292.66, 12893.88, 12507.06, 12131.85, 11767.89, 11414.85, 11072.4, 11404.57, 11062.43, 11394.3, 11736.13, 11384.05, 11042.53, 11373.81, 11032.6, 11363.58, 11704.49, 12055.62, 11693.95, 11343.13, 11683.42, 11332.92, 11672.91, 12023.1, 12383.79, 12012.28, 12372.65, 12001.47, 12361.51, 12732.36, 13114.33, 12720.9, 12339.27, 11969.09, 11610.02, 11958.32, 11599.57, 11251.58, 11589.13, 11936.8, 11578.7, 11231.34, 11568.28, 11221.23, 11557.87, 11904.61, 12261.75, 12629.6, 12250.71, 11883.19, 12239.69, 12606.88, 12985.09, 13374.64, 13775.88, 14189.16, 14614.83, 14176.39, 14601.68, 14163.63, 13738.72, 13326.56, 13726.36, 14138.15, 14562.29, 14125.42, 13701.66, 14112.71, 14536.09, 14100.01, 14523.01, 14958.7, 15407.46, 14945.24, 15393.6, 14931.79, 15379.74, 15841.13, 16316.36, 15826.87, 16301.68, 16790.73, 16287.01, 15798.4, 15324.45, 15784.18, 16257.71, 16745.44, 17247.8, 17765.23, 17232.27, 17749.24, 17216.76, 17733.26, 17201.26, 17717.3, 18248.82, 17701.36, 18232.4, 17685.43, 17154.87, 17669.52, 18199.61, 18745.6, 19307.97, 19887.21, 19290.59, 19869.31, 20465.39, 19851.43, 20446.97, 19833.56, 19238.55, 19815.71, 19221.24, 18644.6, 19203.94, 18627.82, 19186.65, 18611.05, 18052.72, 17511.14, 16985.81, 16476.24, 16970.53, 17479.65, 18004.04, 18544.16, 17987.84, 17448.2, 16924.75, 16417.01, 16909.52, 17416.81, 16894.31, 17401.14, 16879.11, 17385.48, 16863.92, 16358.0, 16848.74, 17354.2, 17874.83, 18411.07, 18963.4, 19532.3, 20118.27, 19514.72, 18929.28, 18361.4, 17810.56, 17276.24, 17794.53, 17260.69, 17778.51, 17245.15, 16727.8, 16225.97, 16712.75, 16211.37, 15725.03, 16196.78, 16682.68, 17183.16, 17698.65, 18229.61, 18776.5, 19339.8, 19919.99, 20517.59, 19902.06, 20499.12, 19884.15, 19287.63, 19866.26, 19270.27, 19848.38, 19252.93, 18675.34, 18115.08, 17571.63, 18098.78, 18641.74, 18082.49, 18624.96, 19183.71, 19759.22, 19166.44, 19741.43, 20333.67, 20943.68, 21571.99, 20924.83, 20297.09, 20906.0, 20278.82, 20887.18, 21513.8, 20868.39, 20242.34, 20849.61, 20224.12, 20830.84, 20205.91, 20812.09, 21436.45, 22079.54, 21417.15, 22059.66, 22721.45, 23403.09, 24105.18, 24828.34, 24083.49, 23360.99, 22660.16, 23339.96, 24040.16, 24761.36, 24018.52, 23297.96, 22599.02, 21921.05, 22578.68, 23256.04, 22558.36, 23235.11, 23932.16, 23214.2, 22517.77, 21842.24, 22497.51, 23172.44, 23867.61, 23151.58, 23846.13, 23130.75, 23824.67, 24539.41, 25275.59, 26033.86, 26814.88, 27619.33, 28447.91, 27594.47, 26766.64, 25963.64, 26742.55, 25940.27, 26718.48, 27520.03, 26694.43, 25893.6, 26670.41, 27470.52, 28294.64, 29143.48, 28269.18, 29117.26, 28243.74, 29091.05, 28218.32, 29064.87, 29936.82, 29038.72, 29909.88, 30807.18, 29882.96, 28986.47, 28116.88, 27273.37, 28091.57, 27248.82, 28066.28, 28908.27, 28041.02, 27199.79, 26383.8, 27175.31, 26360.05, 25569.25, 24802.17, 25546.24, 26312.63, 27102.01, 27915.07, 28752.52, 27889.94, 28726.64, 27864.84, 28700.79, 27839.77, 27004.58, 27814.72, 28649.16, 27789.69, 28623.38, 29482.08, 30366.54, 29455.54, 30339.21, 29429.03, 28546.16, 27689.78, 26859.09, 26053.32, 26834.92, 27639.97, 26810.77, 27615.09, 26786.64, 27590.24, 26762.53, 25959.65, 25180.86, 25936.29, 25158.2, 25912.95, 25135.56, 24381.49, 23650.05, 22940.55, 23628.77, 22919.91, 22232.31, 22899.28, 22212.3, 22878.67, 22192.31, 21526.54, 22172.34, 21507.17, 22152.39, 21487.82, 22132.45, 21468.48, 22112.53, 22775.91, 22092.63, 22755.41, 23438.07, 22734.93, 22052.88, 21391.29, 20749.55, 20127.06, 19523.25, 18937.55, 19505.68, 20090.85, 20693.58, 21314.39, 20674.96, 21295.21, 21934.07, 22592.09, 21914.33, 22571.76, 21894.61, 22551.45, 21874.91, 22531.16, 23207.09, 23903.3, 24620.4, 25359.01, 24598.24, 25336.19, 26096.28, 25313.39, 24553.99, 25290.61, 24531.89, 23795.93, 23082.05, 22389.59, 21717.9, 22369.44, 21698.36, 22349.31, 21678.83, 22329.19, 22999.07, 23689.04, 22978.37, 23667.72, 22957.69, 23646.42, 22937.03, 23625.14, 24333.89, 25063.91, 25815.83, 25041.36, 25792.6, 26566.38, 27363.37, 26542.47, 25746.2, 26518.59, 25723.03, 26494.72, 27289.56, 26470.87, 27265.0, 28082.95, 28925.44, 29793.2, 28899.4, 28032.42, 28873.39, 28007.19, 28847.41, 29712.83, 28821.45, 29686.09, 30576.67, 29659.37, 28769.59, 29632.68, 30521.66, 31437.31, 30494.19, 29579.36, 28691.98, 29552.74, 28666.16, 29526.14, 28640.36, 29499.57, 28614.58, 29473.02, 28588.83, 27731.17, 26899.23, 26092.25, 25309.48, 24550.2, 25286.71, 26045.31, 26826.67, 27631.47, 28460.41, 29314.22, 28434.79, 29287.83, 30166.46, 31071.45, 32003.59, 32963.7, 31974.79, 31015.55, 30085.08, 30987.63, 31917.26, 32874.78, 31888.54, 30931.88, 30003.92, 30904.04, 31831.16, 30876.23, 29949.94, 29051.44, 29922.98, 29025.29, 29896.05, 30792.93, 31716.72, 32668.22, 31688.17, 30737.52, 29815.39, 28920.93, 28053.3, 28894.9, 29761.75, 30654.6, 29734.96, 30627.01, 31545.82, 32492.19, 33466.96, 34470.97, 33436.84, 34439.95, 35473.15, 34408.96, 33376.69, 32375.39, 33346.65, 34347.05, 35377.46, 36438.78, 37531.94, 38657.9, 39817.64, 38623.11, 37464.42, 36340.49, 35250.28, 36307.79, 37397.02, 36275.11, 35186.86, 36242.47, 35155.2, 36209.86, 37296.16, 38415.04, 39567.49, 38380.47, 37229.06, 36112.19, 35028.82, 36079.68, 34997.29, 33947.37, 34965.79, 33916.82, 34934.32, 35982.35, 34902.88, 33855.79, 34871.46, 35917.6, 34840.07, 35885.27, 34808.71, 33764.45, 34777.38, 33734.06, 34746.08, 35788.46, 36862.11, 37967.97, 39107.01, 37933.8, 36795.79, 35691.92, 34621.16];
+const eqLabels = ["Start", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Jan 2021", "Feb 2021", "Feb 2021", "Feb 2021", "Feb 2021", "Feb 2021", "Feb 2021", "Feb 2021", "Feb 2021", "Feb 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Mar 2021", "Apr 2021", "Apr 2021", "Apr 2021", "Apr 2021", "Apr 2021", "Apr 2021", "Apr 2021", "Apr 2021", "Apr 2021", "Apr 2021", "Apr 2021", "Apr 2021", "Apr 2021", "May 2021", "May 2021", "May 2021", "May 2021", "May 2021", "May 2021", "May 2021", "May 2021", "May 2021", "May 2021", "May 2021", "May 2021", "May 2021", "May 2021", "May 2021", "Jun 2021", "Jun 2021", "Jun 2021", "Jun 2021", "Jun 2021", "Jun 2021", "Jun 2021", "Jun 2021", "Jul 2021", "Jul 2021", "Jul 2021", "Jul 2021", "Jul 2021", "Jul 2021", "Jul 2021", "Jul 2021", "Jul 2021", "Jul 2021", "Jul 2021", "Jul 2021", "Jul 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Aug 2021", "Sep 2021", "Sep 2021", "Sep 2021", "Sep 2021", "Sep 2021", "Sep 2021", "Sep 2021", "Sep 2021", "Sep 2021", "Sep 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Oct 2021", "Nov 2021", "Nov 2021", "Nov 2021", "Nov 2021", "Nov 2021", "Nov 2021", "Nov 2021", "Nov 2021", "Nov 2021", "Nov 2021", "Nov 2021", "Nov 2021", "Dec 2021", "Dec 2021", "Dec 2021", "Dec 2021", "Dec 2021", "Dec 2021", "Dec 2021", "Dec 2021", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Jan 2022", "Feb 2022", "Feb 2022", "Feb 2022", "Feb 2022", "Feb 2022", "Feb 2022", "Feb 2022", "Feb 2022", "Mar 2022", "Mar 2022", "Mar 2022", "Mar 2022", "Mar 2022", "Mar 2022", "Mar 2022", "Mar 2022", "Mar 2022", "Mar 2022", "Mar 2022", "Mar 2022", "Mar 2022", "Apr 2022", "Apr 2022", "Apr 2022", "Apr 2022", "Apr 2022", "Apr 2022", "May 2022", "May 2022", "May 2022", "May 2022", "May 2022", "May 2022", "May 2022", "May 2022", "May 2022", "May 2022", "May 2022", "May 2022", "May 2022", "Jun 2022", "Jun 2022", "Jun 2022", "Jun 2022", "Jun 2022", "Jun 2022", "Jun 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Jul 2022", "Aug 2022", "Aug 2022", "Aug 2022", "Aug 2022", "Aug 2022", "Aug 2022", "Aug 2022", "Aug 2022", "Aug 2022", "Aug 2022", "Aug 2022", "Sep 2022", "Sep 2022", "Sep 2022", "Sep 2022", "Sep 2022", "Sep 2022", "Sep 2022", "Sep 2022", "Sep 2022", "Sep 2022", "Oct 2022", "Oct 2022", "Oct 2022", "Oct 2022", "Oct 2022", "Oct 2022", "Oct 2022", "Oct 2022", "Oct 2022", "Oct 2022", "Oct 2022", "Nov 2022", "Nov 2022", "Nov 2022", "Nov 2022", "Nov 2022", "Nov 2022", "Nov 2022", "Nov 2022", "Nov 2022", "Nov 2022", "Nov 2022", "Nov 2022", "Dec 2022", "Dec 2022", "Dec 2022", "Dec 2022", "Dec 2022", "Dec 2022", "Dec 2022", "Dec 2022", "Dec 2022", "Jan 2023", "Jan 2023", "Jan 2023", "Jan 2023", "Jan 2023", "Jan 2023", "Jan 2023", "Jan 2023", "Jan 2023", "Jan 2023", "Jan 2023", "Jan 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Feb 2023", "Mar 2023", "Mar 2023", "Mar 2023", "Mar 2023", "Mar 2023", "Mar 2023", "Mar 2023", "Mar 2023", "Mar 2023", "Apr 2023", "Apr 2023", "Apr 2023", "Apr 2023", "Apr 2023", "Apr 2023", "Apr 2023", "Apr 2023", "Apr 2023", "Apr 2023", "Apr 2023", "Apr 2023", "Apr 2023", "Apr 2023", "May 2023", "May 2023", "May 2023", "May 2023", "May 2023", "May 2023", "May 2023", "Jun 2023", "Jun 2023", "Jun 2023", "Jun 2023", "Jun 2023", "Jun 2023", "Jun 2023", "Jun 2023", "Jun 2023", "Jun 2023", "Jun 2023", "Jul 2023", "Jul 2023", "Jul 2023", "Jul 2023", "Jul 2023", "Jul 2023", "Jul 2023", "Jul 2023", "Aug 2023", "Aug 2023", "Aug 2023", "Aug 2023", "Aug 2023", "Aug 2023", "Aug 2023", "Aug 2023", "Aug 2023", "Aug 2023", "Sep 2023", "Sep 2023", "Sep 2023", "Sep 2023", "Sep 2023", "Sep 2023", "Sep 2023", "Sep 2023", "Sep 2023", "Oct 2023", "Oct 2023", "Oct 2023", "Oct 2023", "Oct 2023", "Oct 2023", "Oct 2023", "Oct 2023", "Oct 2023", "Oct 2023", "Nov 2023", "Nov 2023", "Nov 2023", "Nov 2023", "Nov 2023", "Nov 2023", "Dec 2023", "Dec 2023", "Dec 2023", "Dec 2023", "Dec 2023", "Jan 2024", "Jan 2024", "Jan 2024", "Jan 2024", "Jan 2024", "Jan 2024", "Jan 2024", "Feb 2024", "Feb 2024", "Feb 2024", "Feb 2024", "Feb 2024", "Feb 2024", "Feb 2024", "Feb 2024", "Mar 2024", "Mar 2024", "Mar 2024", "Mar 2024", "Mar 2024", "Mar 2024", "Mar 2024", "Mar 2024", "Apr 2024", "Apr 2024", "Apr 2024", "Apr 2024", "Apr 2024", "Apr 2024", "Apr 2024", "Apr 2024", "Apr 2024", "May 2024", "May 2024", "May 2024", "May 2024", "May 2024", "May 2024", "May 2024", "May 2024", "May 2024", "Jun 2024", "Jun 2024", "Jun 2024", "Jun 2024", "Jun 2024", "Jun 2024", "Jun 2024", "Jun 2024", "Jul 2024", "Jul 2024", "Jul 2024", "Jul 2024", "Jul 2024", "Jul 2024", "Jul 2024", "Jul 2024", "Jul 2024", "Aug 2024", "Aug 2024", "Aug 2024", "Aug 2024", "Aug 2024", "Aug 2024", "Aug 2024", "Aug 2024", "Sep 2024", "Sep 2024", "Sep 2024", "Sep 2024", "Oct 2024", "Oct 2024", "Oct 2024", "Oct 2024", "Oct 2024", "Oct 2024", "Oct 2024", "Oct 2024", "Oct 2024", "Oct 2024", "Nov 2024", "Nov 2024", "Nov 2024", "Nov 2024", "Nov 2024", "Nov 2024", "Nov 2024", "Dec 2024", "Dec 2024", "Dec 2024", "Dec 2024", "Dec 2024", "Dec 2024", "Dec 2024", "Dec 2024", "Dec 2024", "Dec 2024", "Dec 2024", "Jan 2025", "Jan 2025", "Jan 2025", "Jan 2025", "Jan 2025", "Jan 2025", "Jan 2025", "Jan 2025", "Jan 2025", "Jan 2025", "Jan 2025", "Feb 2025", "Feb 2025", "Feb 2025", "Feb 2025", "Feb 2025", "Feb 2025", "Feb 2025", "Feb 2025", "Feb 2025", "Feb 2025", "Feb 2025", "Feb 2025", "Mar 2025", "Mar 2025", "Mar 2025", "Mar 2025", "Mar 2025", "Mar 2025", "Mar 2025", "Mar 2025", "Mar 2025", "Mar 2025", "Mar 2025", "Mar 2025", "Mar 2025", "Apr 2025", "Apr 2025", "Apr 2025", "Apr 2025", "Apr 2025", "Apr 2025", "Apr 2025", "Apr 2025", "Apr 2025", "May 2025", "May 2025", "May 2025", "May 2025", "May 2025", "May 2025", "May 2025", "May 2025", "May 2025", "May 2025", "May 2025", "Jun 2025", "Jun 2025", "Jun 2025", "Jun 2025", "Jun 2025", "Jun 2025", "Jun 2025", "Jun 2025", "Jun 2025", "Jun 2025", "Jun 2025", "Jun 2025", "Jun 2025", "Jul 2025", "Jul 2025", "Jul 2025", "Jul 2025", "Jul 2025", "Jul 2025", "Jul 2025", "Jul 2025", "Jul 2025", "Jul 2025", "Jul 2025", "Aug 2025", "Aug 2025", "Aug 2025", "Aug 2025", "Aug 2025", "Aug 2025", "Aug 2025", "Aug 2025", "Aug 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Sep 2025", "Oct 2025", "Oct 2025", "Oct 2025", "Oct 2025", "Oct 2025", "Oct 2025", "Oct 2025", "Oct 2025", "Oct 2025", "Oct 2025", "Oct 2025", "Nov 2025", "Nov 2025", "Nov 2025", "Nov 2025", "Nov 2025", "Nov 2025", "Nov 2025", "Nov 2025", "Nov 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025", "Dec 2025"];
+const eqPeak = [10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10000.0, 10061.66, 10363.51, 10674.42, 10994.65, 11324.49, 11664.22, 11664.22, 11664.22, 12003.33, 12003.33, 12003.33, 12352.31, 12352.31, 12352.31, 12352.31, 12352.31, 12352.31, 12352.31, 12352.31, 12352.31, 12677.14, 13057.45, 13449.17, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 13852.65, 14189.16, 14614.83, 14614.83, 14614.83, 14614.83, 14614.83, 14614.83, 14614.83, 14614.83, 14614.83, 14614.83, 14614.83, 14614.83, 14614.83, 14614.83, 14614.83, 14958.7, 15407.46, 15407.46, 15407.46, 15407.46, 15407.46, 15841.13, 16316.36, 16316.36, 16316.36, 16790.73, 16790.73, 16790.73, 16790.73, 16790.73, 16790.73, 16790.73, 17247.8, 17765.23, 17765.23, 17765.23, 17765.23, 17765.23, 17765.23, 17765.23, 18248.82, 18248.82, 18248.82, 18248.82, 18248.82, 18248.82, 18248.82, 18745.6, 19307.97, 19887.21, 19887.21, 19887.21, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20465.39, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20517.59, 20943.68, 21571.99, 21571.99, 21571.99, 21571.99, 21571.99, 21571.99, 21571.99, 21571.99, 21571.99, 21571.99, 21571.99, 21571.99, 21571.99, 21571.99, 21571.99, 22079.54, 22079.54, 22079.54, 22721.45, 23403.09, 24105.18, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 24828.34, 25275.59, 26033.86, 26814.88, 27619.33, 28447.91, 28447.91, 28447.91, 28447.91, 28447.91, 28447.91, 28447.91, 28447.91, 28447.91, 28447.91, 28447.91, 28447.91, 28447.91, 29143.48, 29143.48, 29143.48, 29143.48, 29143.48, 29143.48, 29143.48, 29936.82, 29936.82, 29936.82, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 30807.18, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 31437.31, 32003.59, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 32963.7, 33466.96, 34470.97, 34470.97, 34470.97, 35473.15, 35473.15, 35473.15, 35473.15, 35473.15, 35473.15, 35473.15, 36438.78, 37531.94, 38657.9, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64, 39817.64];
+const eqResults = ["", "SL", "SL", "SL", "TP", "TP", "SL", "TP", "TP", "SL", "SL", "SL", "SL", "TP", "SL", "TP", "TP", "SL", "TP", "SL", "SL", "TP", "TP", "TP", "SL", "SL", "SL", "SL", "SL", "SL", "TP", "TP", "TP", "SL", "TP", "SL", "TP", "TP", "SL", "TP", "TP", "SL", "TP", "SL", "SL", "TP", "TP", "SL", "TP", "TP", "SL", "TP", "TP", "TP", "TP", "TP", "TP", "TP", "TP", "SL", "TP", "TP", "SL", "TP", "TP", "SL", "SL", "TP", "SL", "SL", "TP", "TP", "TP", "TP", "TP", "TP", "TP", "SL", "SL", "SL", "SL", "TP", "SL", "TP", "TP", "SL", "TP", "SL", "TP", "SL", "TP", "SL", "TP", "TP", "SL", "SL", "SL", "TP", "TP", "TP", "SL", "TP", "SL", "SL", "SL", "SL", "SL", "SL", "TP", "SL", "TP", "TP", "SL", "SL", "TP", "SL", "TP", "TP", "TP", "SL", "SL", "TP", "SL", "TP", "TP", "TP", "SL", "TP", "SL", "TP", "TP", "TP", "SL", "SL", "SL", "SL", "TP", "SL", "SL", "TP", "TP", "SL", "SL", "TP", "SL", "TP", "TP", "TP", "TP", "SL", "SL", "TP", "TP", "TP", "TP", "TP", "TP", "TP", "SL", "TP", "SL", "SL", "SL", "TP", "TP", "TP", "SL", "SL", "TP", "TP", "SL", "TP", "TP", "TP", "SL", "TP", "SL", "TP", "TP", "TP", "SL", "TP", "TP", "SL", "SL", "SL", "TP", "TP", "TP", "TP", "TP", "SL", "TP", "SL", "TP", "SL", "TP", "TP", "SL", "TP", "SL", "SL", "TP", "TP", "TP", "TP", "TP", "SL", "TP", "TP", "SL", "TP", "SL", "SL", "TP", "SL", "SL", "TP", "SL", "TP", "SL", "SL", "SL", "SL", "SL", "TP", "TP", "TP", "TP", "SL", "SL", "SL", "SL", "TP", "TP", "SL", "TP", "SL", "TP", "SL", "SL", "TP", "TP", "TP", "TP", "TP", "TP", "TP", "SL", "SL", "SL", "SL", "SL", "TP", "SL", "TP", "SL", "SL", "SL", "TP", "SL", "SL", "TP", "TP", "TP", "TP", "TP", "TP", "TP", "TP", "TP", "SL", "TP", "SL", "SL", "TP", "SL", "TP", "SL", "SL", "SL", "SL", "TP", "TP", "SL", "TP", "TP", "TP", "SL", "TP", "TP", "TP", "TP", "SL", "SL", "TP", "SL", "TP", "TP", "SL", "SL", "TP", "SL", "TP", "SL", "TP", "TP", "TP", "SL", "TP", "TP", "TP", "TP", "TP", "SL", "SL", "SL", "TP", "TP", "TP", "SL", "SL", "SL", "SL", "TP", "TP", "SL", "TP", "TP", "SL", "SL", "SL", "TP", "TP", "TP", "SL", "TP", "SL", "TP", "TP", "TP", "TP", "TP", "TP", "TP", "SL", "SL", "SL", "TP", "SL", "TP", "TP", "SL", "SL", "TP", "TP", "TP", "TP", "SL", "TP", "SL", "TP", "SL", "TP", "TP", "SL", "TP", "TP", "SL", "SL", "SL", "SL", "TP", "SL", "TP", "TP", "SL", "SL", "SL", "TP", "SL", "SL", "SL", "TP", "TP", "TP", "TP", "TP", "SL", "TP", "SL", "TP", "SL", "SL", "TP", "TP", "SL", "TP", "TP", "TP", "SL", "TP", "SL", "SL", "SL", "SL", "SL", "TP", "TP", "SL", "TP", "SL", "TP", "SL", "SL", "SL", "TP", "SL", "TP", "SL", "SL", "SL", "SL", "TP", "SL", "SL", "TP", "SL", "TP", "SL", "SL", "TP", "SL", "TP", "SL", "TP", "SL", "TP", "TP", "SL", "TP", "TP", "SL", "SL", "SL", "SL", "SL", "SL", "SL", "TP", "TP", "TP", "TP", "SL", "TP", "TP", "TP", "SL", "TP", "SL", "TP", "SL", "TP", "TP", "TP", "TP", "TP", "SL", "TP", "TP", "SL", "SL", "TP", "SL", "SL", "SL", "SL", "SL", "TP", "SL", "TP", "SL", "TP", "TP", "TP", "SL", "TP", "SL", "TP", "SL", "TP", "TP", "TP", "TP", "SL", "TP", "TP", "TP", "SL", "SL", "TP", "SL", "TP", "TP", "SL", "TP", "TP", "TP", "TP", "SL", "SL", "TP", "SL", "TP", "TP", "SL", "TP", "TP", "SL", "SL", "TP", "TP", "TP", "SL", "SL", "SL", "TP", "SL", "TP", "SL", "TP", "SL", "TP", "SL", "SL", "SL", "SL", "SL", "SL", "TP", "TP", "TP", "TP", "TP", "TP", "SL", "TP", "TP", "TP", "TP", "TP", "SL", "SL", "SL", "TP", "TP", "TP", "SL", "SL", "SL", "TP", "TP", "SL", "SL", "SL", "TP", "SL", "TP", "TP", "TP", "TP", "SL", "SL", "SL", "SL", "SL", "TP", "TP", "TP", "SL", "TP", "TP", "TP", "TP", "TP", "SL", "TP", "TP", "SL", "SL", "SL", "TP", "TP", "TP", "TP", "TP", "TP", "TP", "SL", "SL", "SL", "SL", "TP", "TP", "SL", "SL", "TP", "SL", "TP", "TP", "TP", "TP", "SL", "SL", "SL", "SL", "TP", "SL", "SL", "TP", "SL", "TP", "TP", "SL", "SL", "TP", "TP", "SL", "TP", "SL", "SL", "TP", "SL", "TP", "TP", "TP", "TP", "TP", "SL", "SL", "SL", "SL"];
+
+new Chart(document.getElementById('equityChart'), {
+  type: 'line',
+  data: {
+    labels: eqLabels,
+    datasets: [
+      {
+        data: eqPeak,
+        borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)',
+        borderWidth: 1,
+        borderDash: [4,3],
+        pointRadius: 0,
+        fill: false,
+        tension: 0.3,
+        label: 'Peak'
+      },
+      {
+        data: eq,
+        borderColor: '#22c55e',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: {
+          target: { value: 10000 },
+          above: isDark ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.06)',
+          below: isDark ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.07)'
+        },
+        tension: 0.2,
+        label: 'Equity',
+        segment: {
+          borderColor: ctx => ctx.p0.parsed.y < 10000 ? '#ef4444' : '#22c55e'
+        }
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: ctx => ctx[0].label,
+          label: ctx => {
+            if (ctx.datasetIndex === 0) return 'Peak: $' + ctx.parsed.y.toLocaleString();
+            const result = eqResults[ctx.dataIndex];
+            return 'Capital: $' + ctx.parsed.y.toLocaleString() + (result ? ' · ' + result : '');
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        display: true,
+        ticks: {
+          color: tc,
+          font: { size: 10 },
+          maxTicksLimit: 10,
+          autoSkip: true
+        },
+        grid: { display: false }
+      },
+      y: {
+        grid: { color: gc },
+        ticks: {
+          color: tc,
+          font: { size: 11 },
+          callback: v => '$' + (v/1000).toFixed(0) + 'k'
+        }
+      }
+    }
+  }
+});
+
+
+
+const annualReturns = [33.7, 35.2, 57.9, -9.9, 34.6];
+new Chart(document.getElementById('annualChart'), {
+  type: 'bar',
+  data: { labels: ['2021','2022','2023','2024','2025'], datasets: [{ data: annualReturns, backgroundColor: annualReturns.map(v => v>=0 ? '#22c55e' : '#ef4444'), borderRadius: 4 }] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: tc, font: { size: 12 } }, grid: { display: false } }, y: { ticks: { color: tc, font: { size: 11 }, callback: v => v + '%' }, grid: { color: gc } } } }
+});
+
+new Chart(document.getElementById('streakChart'), {
+  type: 'bar',
+  data: { labels: ['1x','2x','3x','4x','5x','6x','7x'], datasets: [{ data: [138,69,28,12,9,3,1], backgroundColor: '#ef4444', borderRadius: 4, label: '' }] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: tc, font: { size: 11 } }, grid: { display: false }, title: { display: true, text: 'Consecutive Losses', color: tc, font: { size: 11 } } }, y: { ticks: { color: tc, font: { size: 11 } }, grid: { color: gc }, title: { display: true, text: 'Occurrences', color: tc, font: { size: 11 } } } } }
+});
+
+const cond = [
+  { label: 'Win 1 streak', pct: 54.3, diff: +0.4 },
+  { label: 'Loss 1 streak',  pct: 53.7, diff: -0.2 },
+  { label: 'Win 2 streak', pct: 55.3, diff: +1.3 },
+  { label: 'Loss 2 streak',  pct: 48.1, diff: -5.8 },
+  { label: 'Win 3 streak', pct: 56.7, diff: +2.8 },
+  { label: 'Loss 3 streak',  pct: 50.7, diff: -3.3 },
+  { label: 'Win 4 streak', pct: 57.6, diff: +3.6 },
+  { label: 'Loss 4 streak',  pct: 57.6, diff: +3.6 },
+  { label: 'Loss 5 streak',  pct: 64.3, diff: +10.3 },
+];
+const cr = document.getElementById('condRows');
+cond.forEach(c => {
+  const good = c.diff >= 0;
+  const col = c.pct >= 54 ? '#22c55e' : '#ef4444';
+  const dcol = c.diff > 3 ? 'var(--green)' : c.diff < -3 ? 'var(--red)' : 'var(--text3)';
+  cr.innerHTML += `<div class="cond-row">
+    <div class="cond-label">${c.label}</div>
+    <div class="cond-bar-wrap"><div class="cond-bar" style="width:${c.pct}%;background:${col};"></div></div>
+    <div class="cond-val">${c.pct}%</div>
+    <div class="cond-diff" style="color:${dcol};">${c.diff > 0 ? '+' : ''}${c.diff}%</div>
+  </div>`;
+});
+</script>
+<script>
+function toggleDD(btn) {
+  btn.classList.toggle('open');
+  btn.nextElementSibling.classList.toggle('open');
+}
+</script>
+</body>
+</html>
